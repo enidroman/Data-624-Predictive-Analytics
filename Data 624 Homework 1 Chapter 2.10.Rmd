@@ -1,0 +1,572 @@
+---
+title: "Data 624 Homework 1 Chapter 2.10"
+author: "Enid Roman"
+date: "2024-09-06"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+1. Explore the following four time series: Bricks from aus_production, Lynx from pelt, Close from gafa_stock, Demand from vic_elec.
+
+Use ? (or help()) to find out about the data in each series. What is the time interval of each series? Use autoplot() to produce a time plot of each series. For the last plot, modify the axis labels and title.
+
+
+```{r, warning=FALSE, message=FALSE}
+# Load required packages
+
+library(fpp3)
+library(tsibble)
+library(ggplot2)
+```
+
+
+## **Quarterly production of selected commodities in Australia.**
+
+Quarterly estimates of selected indicators of manufacturing production in Australia. aus_production is a half-hourly tsibble with six values:
+
+Beer:	Beer production in megalitres.
+Tobacco:	Tobacco and cigarette production in tonnes.
+Bricks:	Clay brick production in millions of bricks.
+Cement:	Portland cement production in thousands of tonnes.
+Electricity:	Electricity production in gigawatt hours.
+Gas:	Gas production in petajoules.
+
+
+```{r, warning=FALSE, message=FALSE}
+# View the first few rows of the aus_production dataset
+head(aus_production)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Get the list of dates from the 'Quarter' column.
+start_date <- min(aus_production$Quarter)
+end_date <- max(aus_production$Quarter)
+start_date
+end_date
+```
+
+The time interval for Aus_production is Quarterly and it extends from 1956 to 2010. 
+
+
+```{r, warning=FALSE, message=FALSE}
+# Create a time series plot of Bricks production
+aus_production |>
+autoplot(Bricks)
+```
+In aus_production time series the frist half from mid 1900 to about 1975 there was a strong increasing trend. Lots of beers were being produced and trend is going upward. Then we have a big decrease in productin during mid 70s and mid 80s during Australia's recession. From then on there was increase and decrease in production. This is very cyclincal, the data exhibit rises and falls that are not of a fixed frequency. 
+
+
+## **Pelt trading records.**
+
+Hudson Bay Company trading records for Snowshoe Hare and Canadian Lynx furs from 1845 to 1935. This data contains trade records for all areas of the company. Pelt is an annual tsibble with two values:
+
+Hare:	The number of Snowshoe Hare pelts traded.
+Lynx:	The number of Canadian Lynx pelts traded.
+
+
+```{r, warning=FALSE, message=FALSE}
+# View the first few rows of the Pelt dataset
+head(pelt)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Get the list of dates from the 'Year' column.
+start_date <- min(pelt$Year)
+end_date <- max(pelt$Year)
+start_date
+end_date
+```
+The time interval for Pelt is Yearly and it extends from 1845 to 1935.
+
+
+```{r, warning=FALSE, message=FALSE}
+# Create a time series plot of Lynx
+pelt |>
+  autoplot(Lynx)
+```
+
+In Pelt time series the pattern seems to be seasonal but is not seasonal cause annual data does not have seasonality. This time series has a smooth pattern so this makes it a cycle and a life cycle  of the lynx
+
+## **Gafa stock prices.**
+
+Historical stock prices from 2014-2018 for Google, Amazon, Facebook and Apple. All prices are in $USD. gafa_stock is a tsibble containing data on irregular trading days:
+
+Open:	The opening price for the stock.
+High:	The stock's highest trading price.
+Low:	The stock's lowest trading price.
+Close:	The closing price for the stock.
+Adj_Close:	The adjusted closing price for the stock.
+Volume:	The amount of stock traded.
+Each stock is uniquely identified by one key:
+
+Symbol:	The ticker symbol for the stock.
+
+
+```{r, warning=FALSE, message=FALSE}
+# View the first few rows of the gafa_stock dataset
+head(gafa_stock)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Get the list of dates from the 'Year' column.
+start_date <- min(gafa_stock$Date)
+end_date <- max(gafa_stock$Date)
+start_date
+end_date
+```
+
+The time interval for gafa_stock is Yearly and it extends from 1845 to 1935.
+
+
+```{r, warning=FALSE, message=FALSE}
+# Plot the closing prices from the gafa_stock dataset
+gafa_stock |>
+  autoplot(Close)
+```
+
+## **Half-hourly electricity demand for Victoria, Australia.**
+
+vic_elec is a half-hourly tsibble with three values:
+
+Demand:	Total electricity demand in MWh.
+Temperature:	Temperature of Melbourne (BOM site 086071).
+Holiday:	Indicator for if that day is a public holiday.
+
+This data is for operational demand, which is the demand met by local scheduled generating units, semi-scheduled generating units, and non-scheduled intermittent generating units of aggregate capacity larger than 30 MWh, and by generation imports to the region. The operational demand excludes the demand met by non-scheduled non-intermittent generating units, non-scheduled intermittent generating units of aggregate capacity smaller than 30 MWh, exempt generation (e.g. rooftop solar, gas tri-generation, very small wind farms, etc), and demand of local scheduled loads. It also excludes some very large industrial users (such as mines or smelters).
+
+
+```{r, warning=FALSE, message=FALSE}
+# View the first few rows of the vic_elec dataset
+head(vic_elec)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Get the list of dates from the 'Year' column.
+start_date <- min(vic_elec$Date)
+end_date <- max(vic_elec$Date)
+start_date
+end_date
+```
+
+The time interval for vic_elec is half-hourly and it extends from 1/1/2012 to 12/31/2014.
+
+
+```{r, warning=FALSE, message=FALSE}
+# Modifying Axis and Title
+vic_elec %>% 
+  autoplot(Demand) +
+  labs(x = "Date", y = "Demand") +
+  ggtitle("Half-hourly Electricity Demand for Victoria, Australia")
+```
+
+In vic_elec time series is multiple seasonality. Dec., Jan., and Feb., summer month in Australia we see alot of variations and spikes in demand on very hot days, and alot of air conditioner happening. This is why we see the increase variation in the summer. Then as we move along the x axis to autum we have a lower demand thatn summer and higher in winter months, June, July, and August. Then we have spring which is fairly stable season in Victoria. 
+
+
+2. Use filter() to find what days corresponded to the peak closing price for each of the four stocks in gafa_stock.
+
+## **Peak Closting Price**
+
+
+```{r, warning=FALSE, message=FALSE}
+gafa_stock %>%
+  group_by(Symbol) %>%
+  filter(Close == max(Close)) %>%
+  select(Symbol, Date, Close)
+```
+
+Apple had a Max at 232.07 on 10/03/2018. Amazon had a max of 2039.51 on 9/4/2018. Facebook had a max of 217.50 on 7/25/2018. Google had a max of 1268.33 on 7/26/2018.
+
+
+3. Download the file tute1.csv from the book website, open it in Excel (or some other spreadsheet application), and review its contents. You should find four columns of information. Columns B through D each contain a quarterly series, labelled Sales, AdBudget and GDP. Sales contains the quarterly sales for a small company over the period 1981-2005. AdBudget is the advertising budget and GDP is the gross domestic product. All series have been adjusted for inflation.
+
+## **Tutel**
+
+a. You can read the data into R with the following script:
+
+
+```{r, warning=FALSE, message=FALSE}
+# Upload csv file and view the first few rows of the aus_production dataset
+tute1 <- read.csv("https://raw.githubusercontent.com/enidroman/Data-624-Predictive-Analytics/main/tute1.csv")
+head(tute1)
+```
+
+b. Convert the data to time series.
+
+
+```{r, warning=FALSE, message=FALSE}
+mytimeseries <- tute1 |>
+  mutate(Quarter = yearquarter(Quarter)) |>
+  as_tsibble(index = Quarter)
+```
+
+
+c. Construct time series plots of each of the three series.
+
+Check what happens when you don’t include facet_grid().
+
+
+```{r, warning=FALSE, message=FALSE}
+mytimeseries |>
+  pivot_longer(-Quarter) |>
+  ggplot(aes(x = Quarter, y = value, colour = name)) +
+  geom_line() +
+  facet_grid(name ~ ., scales = "free_y") +
+  ggtitle("facet_grid") 
+
+mytimeseries %>%
+  pivot_longer(-Quarter) %>%
+  ggplot(aes(x = Quarter, y = value, colour = name)) +
+  geom_line() +
+  ggtitle("No facet_grid")
+  
+  
+```
+
+When you don't include facet_grid(), the plot will not be divided into separate panels; instead, you will get a single plot that displays all the data points together.
+
+When you include facet_grid(), the plot will be split into multiple panels based on the levels of the categorical variable, making it easier to compare groups visually.
+
+
+4. The USgas package contains data on the demand for natural gas in the US.
+
+## **USgas**
+
+a. Install the USgas package.
+
+
+```{r, warning=FALSE, message=FALSE}
+#install.packages('USgas')
+library(USgas)
+data("us_total")
+str(us_total)
+```
+
+b. Create a tsibble from us_total with year as the index and state as the key.
+
+
+```{r, warning=FALSE, message=FALSE}
+us_total <- us_total %>%
+  as_tibble(key = state,
+            index = year)
+```
+
+
+c. Plot the annual natural gas consumption by state for the New England area (comprising the states of Maine, Vermont, New Hampshire, Massachusetts, Connecticut and Rhode Island).
+
+
+```{r, warning=FALSE, message=FALSE}
+us_total %>%
+  filter(state %in% c('Maine', 'Vermont', 'New Hampshire', 'Massachusetts', 'Connecticut', 'Rhode Island')) %>%
+  ggplot(aes(x = year, y = y, colour = state)) +
+  geom_line() +
+  facet_grid(state ~., scales = "free_y") +
+  labs(title = "Annual Natural Gas Consumption in New England",
+       y = "Consumption")
+```
+
+5. a. Download tourism.xlsx from the book website and read it into R using readxl::read_excel().
+
+## **Tourism**
+
+
+```{r, warning=FALSE, message=FALSE}
+tourism <- read.csv("https://raw.githubusercontent.com/enidroman/Data-624-Predictive-Analytics/main/tourism.csv")
+head(tourism)
+```
+
+b. Create a tsibble which is identical to the tourism tsibble from the tsibble package.
+
+
+```{r, warning=FALSE, message=FALSE}
+tourism_ts <- tourism %>%
+  mutate(Quarter = yearquarter(Quarter)) %>%
+  as_tsibble(key = c(Region, State, Purpose),
+             index = Quarter)
+```
+
+
+c. Find what combination of Region and Purpose had the maximum number of overnight trips on average.
+
+
+```{r, warning=FALSE, message=FALSE}
+tourism_ts %>%
+  group_by(Region, Purpose) %>%
+  mutate(Avg_Trips = mean(Trips)) %>%
+  ungroup() %>%
+  filter(Avg_Trips == max(Avg_Trips)) %>%
+  distinct(Region, Purpose)
+```
+
+Syndey, Australia has the maximum number of overnight trips on average for Visiting.
+
+
+d. Create a new tsibble which combines the Purposes and Regions, and just has total trips by State.
+
+
+```{r, warning=FALSE, message=FALSE}
+# Tsibble for Total Trips by State
+total_trips_by_state <- tourism %>%
+  group_by(State) %>%
+  summarise(total_trips = sum(Trips)) %>%
+  arrange(desc(total_trips))
+
+head(total_trips_by_state)
+```
+
+8. Use the following graphics functions: autoplot(), gg_season(), gg_subseries(), gg_lag(), ACF() and explore features from the following time series: “Total Private” Employed from us_employment, Bricks from aus_production, Hare from pelt, “H02” Cost from PBS, and Barrels from us_gasoline.
+
+Can you spot any seasonality, cyclicity and trend?
+What do you learn about the series?
+What can you say about the seasonal patterns?
+Can you identify any unusual years?
+
+
+## **"Total Private" Employed from us_employment**
+
+
+```{r, warning=FALSE, message=FALSE}
+# This will produce a time series plot showing the number of people employed in the "Total Private" sector over time. The plot visualizes employment data over time.
+data("us_employment")
+us_employment %>% 
+  filter(Title == "Total Private") %>% 
+  autoplot(Employed) +
+  ggtitle("Auto Plot") 
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a seasonal decomposition plot for the Employed variable in the us_employment dataset, filtered to include only the "Total Private" sector. This plot helps visualize the seasonal patterns within the employment data.
+us_employment %>% filter(Title == "Total Private") %>% gg_season(Employed) +
+  ggtitle("Seasonal Decompositon Plot")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a subseries plot for the Employed variable in the us_employment dataset, filtered to include only the "Total Private" sector. A subseries plot helps visualize and compare seasonal patterns across different periods, such as months or quarters.
+us_employment %>% 
+  filter(Title == "Total Private") %>% 
+  gg_subseries(Employed) +
+  ggtitle("Subseries Plot")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# This is to generate a lag plot for the "Total Private" employment data from the us_employment dataset. A lag plot is useful for detecting autocorrelation in time series data by plotting the values of a variable against lagged versions of itself.
+us_employment %>% 
+  filter(Title == "Total Private") %>% 
+  gg_lag(Employed) +
+  ggtitle("Lag Plot")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates an Autocorrelation Function (ACF) plot for private-sector employment data using the us_employment dataset. An ACF plot is helpful in determining the degree of autocorrelation in a time series.
+us_employment %>%
+  filter(Title == "Total Private") %>%
+  ACF(Employed) %>%
+  autoplot() +
+  ggtitle("Autocorrelation Function Plot")
+```
+
+In regards to “Total Private” Employed from us_employment, the data shows a strong upward trend with clear seasonal fluctuations. Meaning both seasonality and trend are present.There is no evidence of cyclical patterns in the series. Employment levels steadily increase over time, with stable seasonal patterns throughout the year. However, a slight rise occurs in June, which tapers off after December. Anomalies were observed in the years 2008/2010.
+
+
+## **Bricks from aus_production**
+
+
+```{r, warning=FALSE, message=FALSE}
+# This will produce a time series plot showing the number of people employed in the "Total Private" sector over time
+data("us_employment")
+data("aus_production")
+aus_production %>% 
+  autoplot(Bricks) +
+  ggtitle("Auto Plot")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a seasonal decomposition plot for the Bricks variable from the aus_production dataset. The plot visualizes seasonal patterns in the production of bricks over time.
+aus_production %>% 
+  gg_season(Bricks) +
+  ggtitle("Seasonal Decompositon Plot")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a subseries plot for the Bricks variable from the aus_production dataset.
+aus_production %>% 
+  gg_subseries(Bricks) +
+  ggtitle("Subseries Plot")
+```
+
+```{r, warning=FALSE, message=FALSE}
+#  This generates a lag plot for the Bricks variable from the aus_production dataset.
+aus_production %>% 
+  gg_lag(Bricks) +
+  ggtitle("Lag Plot")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# This generates an Autocorrelation Function (ACF) plot for the Bricks variable from the aus_production dataset.
+aus_production %>% 
+  ACF(Bricks) %>% 
+  autoplot() + 
+  ggtitle("Autocorrelation Function Plot")
+```
+
+In regards to Bricks from aus_production, the data reveals significant seasonality each year and shows clear cyclic behavior with a 40-year period. No noticeable trend is present over this timeframe. Brick production rises from the first to the third quarter, then declines in the fourth quarter. A marked drop in brick production is evident around 1983.
+
+
+## **Hare from Pelt**
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a time series plot for the Hare variable from the pelt dataset.
+data("pelt")
+pelt %>% 
+  autoplot(Hare) +
+  ggtitle("Auto Plot")
+```
+
+For gg_season: The data must contain at least one observation per seasonal period.
+
+
+```{r, warning=FALSE, message=FALSE}
+#pelt %>% 
+  #gg_season(Hare)
+  #ggtitle("Seasonal Decomposition")
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a subseries plot for the Hare variable from the pelt dataset. 
+pelt %>% 
+  gg_subseries(Hare)+
+  ggtitle("Subseries Plot")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a lag plot for the Hare variable from the pelt dataset.
+pelt %>% 
+  gg_lag(Hare) +
+  ggtitle("Lag Plot")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# This generates an Autocorrelation Function (ACF) plot for the Hare variable from the pelt dataset. 
+pelt %>% 
+  ACF(Hare) %>% 
+  autoplot() + 
+  ggtitle("Autocorrelation Function Plot")
+```
+
+In regards to Hare from pelt, the data demonstrates cyclical behavior with no apparent trend or clear seasonality. The ACF plot indicates a recurring cycle approximately every ten years. The trend shows notable fluctuations over time. There is a significant drop before the 1860s. A marked increase occurs after 1860. There is another drop after the mid-1860s. An increase is observed before 1870. These fluctuations appear to follow a pattern of varying significantly approximately every 5 years. The significant drops and increases at these points, especially around the 1860s, can be considered unusual or noteworthy.
+
+Please note for Seasonal Decomposition Plot, the data must contain at least one observation per seasonal period. In which it lacks. For a Seasonal Decomposition Plot to be effective, the dataset needs to include at least one data point for each season or period within the cycle. However, the current dataset lacks this requirement, meaning there are not enough observations to properly capture or analyze the seasonal patterns. Without sufficient data for each season, the decomposition may not yield accurate or meaningful results.
+
+ 
+## **“H02” Cost from PBS**
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a time series plot for the Cost variable within the H02 category from the PBS dataset. This plot visualizes how the cost associated with the H02 category changes over time.
+h_02 <- PBS %>% filter(ATC2 == "H02") 
+h_02 %>% autoplot(Cost) +
+  ggtitle("Auto Plot")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a seasonal decomposition plot for the Cost variable within the H02 category from the h_02 dataset. 
+h_02 %>% gg_season(Cost) +
+  ggtitle("Seasonal Decompositon Plot")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a subseries plot for the Cost variable within the H02 category from the h_02 dataset. 
+h_02 %>% gg_subseries(Cost) +
+  ggtitle("Subseries Plot")
+```
+
+The data provided to contains more than one time series. Please filter a single time series to use `gg_lag()
+
+
+```{r, warning=FALSE, message=FALSE}
+#h_02 %>% gg_lag(Cost) +
+  #ggtitle("Lag Plot")
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates an Autocorrelation Function (ACF) plot for the Cost variable within the H02 category from the h_02 dataset.
+h_02 %>% 
+  ACF(Cost) %>% 
+  autoplot() + 
+  ggtitle("Autocorrelation Function Plot")
+```
+
+In regards to “H02” Cost from PBS, The data displays strong annual seasonality and distinct cyclic behavior, but no noticeable trend.From 1995 to 2005, each month shows an upward fluctuation for Concessional Co-Payments, General Co-Payments, and Concessional/Safety Co-Payments. However, General Safety Co-Payments experienced a significant drop in the first few months of 1995, followed by fluctuations until 2005. This period, especially the drop in early 1995 and the fluctuations throughout the rest of the decade, can be considered unusual or noteworthy.
+
+Please note in regards to Lag Plot, the data provided needs to contains more than one time series. Please filter a single time series to use `gg_lag(). In which this data lacks. A Lag Plot is typically used to identify patterns or relationships within a single time series by plotting values at different time lags. However, the provided data contains more than one time series, which is not suitable for this type of analysis. To use the gg_lag() function, a single time series needs to be selected or filtered from the dataset. Since the current data lacks a singular time series, it cannot be used directly for creating a lag plot until a single time series is isolated.
+
+
+## **Barrels from us_gasoline**
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a time series plot for the us_gasoline dataset.
+data("us_gasoline")
+us_gasoline %>% 
+  autoplot() + 
+  ggtitle("Autoplot")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a seasonal decomposition plot for the us_gasoline dataset.
+us_gasoline %>% 
+  gg_season() +
+  ggtitle("Seasonal Decomposition Plot")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a subseries plot for the us_gasoline dataset.
+us_gasoline %>% 
+  gg_subseries()+
+  ggtitle("Subseries Plot")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a lag plot for the us_gasoline dataset.
+us_gasoline %>% 
+  gg_lag() +
+  ggtitle("Lag Plot")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# This generates a lag plot for the us_gasoline dataset. 
+us_gasoline %>% 
+  ACF() %>% 
+  autoplot() + 
+  ggtitle("Autocorrelation Function Plot")
+```
+
+In regards to Barrels from us_gasoline, There is no trend, seasonality, or cyclic behavior in the data. It shows random fluctuations that seem unpredictable, with no clear patterns to support the creation of a forecasting model.From 1995 to 2015, the data shows an increase in fluctuation over time. There is a slight downward trend from 2008 to after 2009, followed by an increase again. These periods of increased fluctuation and the specific downturn from 2008 to after 2009 could be considered unusual or noteworthy years.
+
+
+
+
+
