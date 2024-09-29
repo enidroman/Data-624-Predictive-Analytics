@@ -1,0 +1,243 @@
+---
+title: "Data 624 Homework 4 Chapter 3.1"
+author: "Enid Roman"
+date: "2024-09-28"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## **3.1. The UC Irvine Machine Learning Repository6 contains a data set related to glass identification. The data consist of 214 glass samples labeled as one of seven class categories. There are nine predictors, including the refractive index and percentages of eight elements: Na, Mg, Al, Si, K, Ca, Ba, and Fe. The data can be accessed via:**
+
+
+```{r, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(gridExtra)
+library(dplyr) 
+library(tidyverse)
+library(corrplot)
+library(tidyr)
+
+
+#install.packages('mlbench')
+library(mlbench)
+data(Glass)
+str(Glass)
+```
+
+## **(a) Using visualizations, explore the predictor variables to understand their distributions as well as the relationships between predictors.**
+
+
+```{r, warning=FALSE, message=FALSE}
+# Create individual histograms for each predictor with density line
+Glass %>%
+  keep(is.numeric) %>%
+  gather() %>%
+  ggplot(aes(value)) + 
+  geom_histogram(aes(y=..density..), bins = 15, fill="black", alpha=0.7) + 
+  geom_density(color="red", size=1) + 
+  facet_wrap(~key, scales = 'free') +
+  ggtitle("Histograms of Numerical Predictors") +
+  theme_minimal()
+
+# Compute the correlation matrix for numerical variables 
+cor_matrix <- cor(Glass[, sapply(Glass, is.numeric)])
+
+# Generate the correlation plot
+corrplot(cor_matrix, method = "color", type = "upper", 
+         tl.col = "black", tl.cex = 0.8, 
+         addCoef.col = "black", number.cex = 0.7, 
+         col = colorRampPalette(c("blue", "white", "red"))(200),
+         title = "Correlation Plot of Numerical Predictors", 
+         mar = c(0, 0, 2, 0))
+
+# Create the boxplot for numerical variables 
+Glass %>%
+  keep(is.numeric) %>%
+  gather() %>%
+  ggplot(aes(value)) + 
+  geom_boxplot() + 
+  facet_wrap(~key, scales = 'free') +
+  ggtitle("Boxplots of Numerical Predictors")
+
+
+```
+Outliers:
+
+Histogram:
+Na and Ca is Fairly normally distributed with slight skew.
+Ba and Fe have many values concentrated near zero, suggesting these elements are absent or in trace amounts in most samples.
+
+Correlation:
+Ca and RI show a strong positive correlation, meaning as calcium increases, the refractive index tends to increase.
+Mg and Na show a weak negative correlation, suggesting these elements do not vary together in this dataset.
+
+Boxplot:
+RI and Ca have clear distinctions between different glass types, with certain types having higher values than others.
+Mg and Ba show that some types of glass have very low or zero amounts, as evidenced by compact boxplots with little spread.
+
+
+## **(b) Do there appear to be any outliers in the data? Are any predictors skewed?**
+
+Outliers are present in 8 out of the 9 predictors, including RI, Na, Al, Si, K, Ca, Ba, and Fe. The only variable without visible outliers is Mg.
+
+
+Skewness:
+
+Refractive Index (RI): Slight right-skewness (most values around a central point, slight extension to the right).
+Sodium (Na): Right-skewed (values concentrated around 13-15, tail toward higher values).
+Magnesium (Mg): Left-skewed. Most values are higher, and there is a tail extending toward lower values, indicating that a few samples have lower magnesium content.
+Aluminum (Al): Right-skewed (values between 1 and 2, with a long tail toward higher values).
+Silicon (Si): Left-skewed (majority of values are high, with a tail extending to lower values).
+Potassium (K): Strong right-skewness (values near zero, with a long tail toward higher values).
+Calcium (Ca): Slight right-skewness (fairly uniform, slight skew toward higher values).
+Barium (Ba): Strong right-skewness (most values near zero, long tail toward higher values).
+Iron (Fe): Strong right-skewness (majority of values near zero, with a tail toward higher values).
+
+Left-skewed predictors: Si (Silicon) and Mg (Magnesium) are left-skewed, meaning their distributions have longer tails toward lower values, while most of the data is concentrated on the higher end.
+Right-skewed predictors: Na, Al, K, Ba, and Fe show right-skewness, with a long tail extending toward higher values.
+Slight right-skewness: RI and Ca show only slight skewness, with a relatively balanced distribution.
+
+
+## **(c) Are there any relevant transformations of one or more predictors that might improve the classification model?**
+
+Applying transformations to some of the skewed predictors can improve the performance of a classification model. Specifically, transformations can help normalize the data, reduce skewness, and mitigate the impact of outliers, which can in turn lead to better model performance. Here's a summary of relevant transformations for the Glass dataset based on the skewness and presence of outliers.
+
+Right-skewed distributions: Transformations like the log, square root, or Box-Cox transformations are commonly used to reduce right skewness.
+Left-skewed distributions: A reverse log transformation or square root transformation can be used to normalize left-skewed data.
+Outliers: Transformations can reduce the impact of outliers by compressing the extreme values.
+
+Log transformations are recommended for right-skewed variables (Na, Al, K, Ba, Fe).
+Reverse log transformations can help with left-skewed variables like Mg and Si.
+For slightly skewed variables like Ca and RI, a square root transformation would be beneficial.
+
+
+## **3.2. The soybean data can also be found at the UC Irvine Machine Learning Repository. Data were collected to predict disease in 683 soybeans. The 35 predictors are mostly categorical and include information on the environmental conditions (e.g., temperature, precipitation) and plant conditions (e.g., left spots, mold growth). The outcome labels consist of 19 distinct classes. The data can be loaded via:**
+
+
+```{r}
+library(mlbench)
+data(Soybean)
+## See ?Soybean for details
+## ?Soybean
+```
+
+
+## **(a) Investigate the frequency distributions for the categorical predictors. Are any of the distributions degenerate in the ways discussed earlier in this chapter?**
+
+
+```{r, warning=FALSE, message=FALSE}
+
+# Check the structure to identify categorical variables
+str(Soybean)
+
+# Identify categorical columns
+categorical_columns <- names(Soybean)[sapply(Soybean, is.factor)]
+
+# Create bar plots for each categorical variable
+for (col in categorical_columns) {
+  # Create the bar plot
+  p <- ggplot(Soybean, aes_string(x = col)) +
+    geom_bar(fill = "skyblue", color = "black") +
+    theme_minimal() +
+    labs(title = paste("Bar Plot of", col), x = col, y = "Frequency") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # Print the plot
+  print(p)
+}                                      
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Loop through each categorical variable and calculate the proportion of each category
+for (col in categorical_columns) {
+  cat("Distribution of", col, ":\n")
+  print(prop.table(table(Soybean[[col]])))
+  cat("\n")
+}
+```
+
+
+Yes there are highly degenerate variables: Mycelium, Canker Lesion, Sclerotia, Seed Size, Shriveling, Seed Discolor, Mold Growth are highly degenerate because the majority of observations fall into a single category.
+
+The well-distributed variables: Variables like Class (target), Date, Plant Stand, and Precip show more balance and provide better variability for modeling.
+
+
+## **(b) Roughly 18 % of the data are missing. Are there particular predictors that are more likely to be missing? Is the pattern of missing data related to the classes?**
+
+
+```{r, warning=FALSE, message=FALSE}
+# Check overall proportion of missing data
+total_missing <- sum(is.na(Soybean)) / (nrow(Soybean) * ncol(Soybean)) * 100
+cat("Overall percentage of missing data: ", total_missing, "%\n\n")
+
+# Check missing data for each predictor
+missing_data_summary <- colSums(is.na(Soybean)) / nrow(Soybean) * 100
+cat("Missing data percentage for each predictor:\n")
+print(missing_data_summary)
+
+# Visualize missing data distribution across predictors
+missing_data_df <- data.frame(
+  Predictor = names(missing_data_summary),
+  MissingPercentage = missing_data_summary
+)
+
+# Plot bar chart of missing data percentage for each predictor
+ggplot(missing_data_df, aes(x = reorder(Predictor, -MissingPercentage), y = MissingPercentage)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  coord_flip() +
+  labs(title = "Missing Data Percentage by Predictor", x = "Predictor", y = "Missing Percentage") +
+  theme_minimal()
+
+# Investigate if the pattern of missing data is related to classes
+missing_by_class <- Soybean %>%
+  mutate(MissingCount = rowSums(is.na(Soybean))) %>%
+  group_by(Class) %>%
+  summarise(AvgMissing = mean(MissingCount))
+
+# Print missing data summary by class
+cat("\nAverage missing data count by class:\n")
+print(missing_by_class)
+
+# Visualize missing data pattern by class
+ggplot(missing_by_class, aes(x = Class, y = AvgMissing)) +
+  geom_bar(stat = "identity", fill = "lightgreen", color = "black") +
+  coord_flip() +
+  labs(title = "Average Missing Data Count by Class", x = "Class", y = "Average Missing Values") +
+  theme_minimal()
+
+```
+
+Yes, some predictors are significantly more likely to have missing data compared to others. According to the bar plot and data you've shared:
+
+Hail, Sever, Seed Treatment (seed.tmt), Germ, Leaf Mildness (leaf.mild), and Shriveling have the highest percentages of missing data, each with more than 15% missing values.
+Hail, Sever, Seed Treatment, Lodging all have about 17.7% missing data. Variables like Leaves, Class, Date, and Area Damage have little to no missing data, making them more reliable predictors.
+
+Hail, Sever, Seed Treatment, Germ, Leaf Halo, Leaf Shread, Leaf Malformation (leaf.malf) all exhibit significantly high percentages of missing data. These predictors might need special handling, such as imputation or exclusion, depending on their relevance to the analysis.
+
+Predictors most likely to have missing data: Hail, Sever, Seed Treatment, Germ, Leaf Mildness, and Shriveling. These variables should be carefully considered in the analysis, as their high rates of missingness could influence model performance.
+
+Yes, the pattern of missing data appears to vary by class. From the second bar plot:
+
+2-4-D-Injury and Cyst-Nematode classes show the highest average missing values, with 28.12% and 24.00% missing data on average, respectively.
+Other classes, such as Anthracnose, Bacterial Blight, Bacterial Pustule, Brown Spot, and Charcoal Rot, show no missing data or very little missing data.
+Some classes (e.g., Diaporthe Pod & Stem Blight) exhibit moderate amounts of missing data (~11.8%).
+
+2-4-D-Injury and Cyst-Nematode: These classes have the most missing data, with more than 20% of their values missing on average. This could potentially affect the model's ability to classify these diseases accurately.
+Classes with little or no missing data, such as Anthracnose and Bacterial Blight, will likely not be affected by missingness.
+
+Classes affected by missing data: The missing data appears to disproportionately affect certain classes, particularly 2-4-D-Injury and Cyst-Nematode, which show significantly higher rates of missing values compared to other classes.
+
+## **(c) Develop a strategy for handling missing data, either by eliminating predictors or imputation.**
+
+I would first eliminate predictors with more than 15% missing data, Hail, Sever, Seed Treatment, Shriveling, and Mold Growth.
+Then, impute missing data for important predictors using mode imputation (for categorical variables) or KNN imputation for more accurate results. Predictors like Precipitation, Temperature, Leaf-related attributes (Halo, Marg, Size, Shread, Malf), Plant Stand, Roots, and Stem.
+Lastly optionally eliminate rows from classes like 2-4-D-Injury and Cyst-Nematode if missingness is very high, or use class-specific imputation to handle missing data based on class.
+
+By following this strategy of elimination for highly missing predictors and imputation for important predictors with moderate missing data, I can preserve the integrity of the Soybean dataset while minimizing the impact of missing values on model performance. Depending on my analysis, I can also consider handling class-specific missing data to ensure accurate classification.
