@@ -1,0 +1,922 @@
+---
+title: "Data 624 Homework 7 Chapter 6 Linear Regression and Its Cousins"
+author: "Enid Roman"
+date: "2024-11-03"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **6.2. Developing a model to predict permeability (see Sect. 1.4) could save significant resources for a pharmaceutical company, while at the same time more rapidly identifying molecules that have a sufficient permeability to become a drug.**
+
+**(a) Start R and use these commands to load the data:**
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(AppliedPredictiveModeling)
+library(caret)
+#install.packages("glmnet")
+library(glmnet)
+library(kableExtra)
+library(dplyr)
+library(ggplot2)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+data(permeability)
+permeability
+```
+
+
+**The matrix fingerprints contains the 1,107 binary molecular predictors for the 165 compounds, while permeability contains permeability response**
+
+**(b) The fingerprint predictors indicate the presence or absence of substructures of a molecule and are often sparse meaning that relatively few of the molecules contain each substructure. Filter out the predictors that have low frequencies using the nearZeroVar function from the caret package. How many predictors are left for modeling?**
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Get number of rows
+n_rows <- dim(fingerprints)[1]
+
+# Get number of columns
+n_cols <- dim(fingerprints)[2]
+
+# Display the number of rows and columns
+n_rows
+n_cols
+```
+
+The fingerprints dataset has 165 rows and 1,107 columns.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Fingerprints is a data frame with 1,107 binary predictors for 165 compounds
+# Use nearZeroVar to identify near-zero variance predictors
+nzv_indices <- nearZeroVar(fingerprints, saveMetrics = TRUE)
+
+# Count the number of predictors with non-zero variance
+non_nzv_predictors <- sum(!nzv_indices$nzv)
+
+# Display the result
+non_nzv_predictors
+```
+
+Identify near-zero variance predictors: nearZeroVar(fingerprints, saveMetrics = TRUE) identified predictors with low variance and created a metrics table in nzv_indices.
+
+Count non-zero variance predictors: sum(!nzv_indices$nzv) counted predictors that do not have near-zero variance, which came to 388.
+
+This means that out of the original 1,107 predictors, only 388 had sufficient variance for modeling, while the rest (719 predictors) were filtered out due to near-zero variance.
+
+388 indicates that, after filtering out the near-zero variance predictors, you have 388 predictors left in your fingerprints data frame for modeling.
+
+
+**(c) Split the data into a training and a test set, pre-process the data, and tune a PLS model. How many latent variables are optimal and what is the corresponding resampled estimate of R2?**
+
+Step 1: Set Up and Split the Data
+
+First, we split the data into training and test sets. This ensures we have separate data to evaluate our model’s performance.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set the seed for reproducibility
+set.seed(123)
+
+# Split the data into training and test sets based on the permeability vector
+trainIndex <- createDataPartition(permeability, p = 0.8, list = FALSE)
+train <- fingerprints[trainIndex, ]  # Training predictors
+test <- fingerprints[-trainIndex, ]  # Testing predictors
+train_permeability <- permeability[trainIndex]  # Training response
+test_permeability <- permeability[-trainIndex]  # Testing response
+
+```
+
+
+Step 2: Pre-process the Data
+
+Center and scale the training predictors and apply the same transformations to the test predictors to ensure consistency.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Pre-process the data (predictors only)
+preProc <- preProcess(train, method = c("center", "scale"))
+
+# Apply pre-processing transformations
+trainTransformed <- as.data.frame(predict(preProc, train))  # Ensure it stays a data frame
+testTransformed <- as.data.frame(predict(preProc, test))    # Ensure it stays a data frame
+
+```
+
+
+Step 3: Add the Response Variable to the Transformed Data
+
+After pre-processing, add the response variable (permeability) back to the transformed training and test sets.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Add permeability as the response variable back to the training and test sets
+trainTransformed$permeability <- train_permeability
+testTransformed$permeability <- test_permeability
+```
+
+
+Step 4: Ensure Column Names Are Valid
+
+Sometimes, column names may have non-standard characters, especially after transformations. This step makes the column names syntactically valid and unique.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Ensure all column names are syntactically valid and unique
+colnames(trainTransformed) <- make.names(colnames(trainTransformed), unique = TRUE)
+colnames(testTransformed) <- make.names(colnames(testTransformed), unique = TRUE)
+```
+
+
+Step 5: Tune the PLS Model
+
+Now, we use cross-validation to tune a PLS model. We try different numbers of latent variables to find the optimal configuration.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set up cross-validation controls
+train_control <- trainControl(method = "cv", number = 10)
+
+# Tune a PLS model
+tuneResult <- train(permeability ~ ., data = trainTransformed, 
+                    method = "pls", 
+                    trControl = train_control,
+                    tuneLength = 20)  # Tests up to 20 latent variables
+```
+
+
+
+Step 6: Extract the Optimal Number of Latent Variables and Resampled𝑅2
+ 
+After training the model, find the optimal number of latent variables and the corresponding resampled estimate of𝑅2.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Get the optimal number of latent variables
+optimalLV <- tuneResult$bestTune$ncomp
+cat("Optimal Number of Latent Variables:", optimalLV, "\n")
+
+# Get the resampled estimate of R^2 for the optimal model
+resampledR2 <- max(tuneResult$results$Rsquared)
+cat("Resampled R^2 for Optimal Model:", resampledR2, "\n")
+
+```
+
+Optimal Number of Latent Variables (2): This indicates that using 2 latent variables maximizes the cross-validated performance of your PLS model. This model captures the underlying structure of the data with two components, balancing between complexity and predictive power. 
+
+Resampled𝑅2of 0.527: An𝑅2 value of 0.527 suggests that the model explains about 52.7% of the variance in the permeability response variable on unseen data, based on cross-validation. This indicates a moderate level of predictive performance. The higher the𝑅2, the better the model explains the variability in the response variable. In this case, the model explains over half of the variability in the permeability response variable. 
+
+
+Step 7: Review Results and Plot Tuning
+
+Finally, review the results and plot the performance of the model across different numbers of latent variables.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Print a summary of the tuning results
+print(tuneResult)
+
+# Plot tuning results to visualize performance
+plot(tuneResult)
+
+```
+
+RMSE: The RMSE value of 11.92112 indicates the average prediction error of the model on the permeability response variable. Lower RMSE values generally indicate better model performance. 
+
+𝑅2: The resampled R2 value of 0.4783961 suggests that about 47.8% of the variance in permeability is explained by the model with 2 latent variables. This moderate R2 value indicates that while the model captures some of the relationship between predictors and response, there remains unexplained variance. 
+
+MAE: The Mean Absolute Error of 8.709084 provides a measure of the average absolute prediction error, giving another perspective on model accuracy that is less sensitive to large errors than RMSE. 
+
+The model with 2 latent variables provides the best balance of predictive accuracy and model simplicity for this dataset. Given these results, you can proceed with this configuration as the final model for further evaluation on the test set. 
+
+
+The plot displays RMSE (Cross-Validation) on the y-axis versus #Components (number of latent variables) on the x-axis. Here’s what we can observe:
+
+Initial Drop in RMSE: There is a significant drop in RMSE when moving from 1 component to 2 components, indicating that the model’s accuracy improves notably by adding a second latent variable.
+
+Increasing RMSE Beyond 2 Components: After 2 components, the RMSE gradually increases, suggesting that adding more components does not improve the model’s predictive accuracy. This could be due to overfitting, where the model becomes more complex without meaningful gains in performance.
+
+Optimal Number of Components: As shown in the text summary, 2 components (latent variables) yield the lowest RMSE, making it the optimal choice. This aligns with the observation that RMSE increases with more components, making 2 components the sweet spot for this model.
+
+The plot visually confirms that 2 components minimize RMSE, and thus this number was chosen as the optimal model configuration.
+
+This analysis indicates that the model captures the relationship between predictors and permeability effectively with 2 components, while avoiding overfitting. The model explains about 47.8% of the variance in the permeability response variable, providing a moderate level of predictive performance. 
+
+**(d) Predict the response for the test set. What is the test set estimate of R2?**
+
+Step 1: Predict the Response for the Test Set
+
+Using the tuned PLS model with 2 latent variables, predict the response variable (permeability) for the test set.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Predict permeability on the test set using the optimal model
+test_predictions <- predict(tuneResult, newdata = testTransformed)
+```
+
+
+Step 2: Calculate the Test Set Estimate of R2
+
+Calculate the test set estimate of R2 to evaluate the model’s performance on unseen data.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Calculate the test set R^2
+# Note: Ensure that `test_permeability` is the actual response for the test set
+test_R2 <- cor(test_predictions, testTransformed$permeability)^2
+cat("Test Set Estimate of R^2:", test_R2, "\n")
+```
+
+Moderate Generalization Performance: The R2 value on the test set is lower than the resampled R2 on the training set (which was around 0.478). This drop in R2 could indicate that the model has not generalized as well as expected, potentially due to:
+
+Overfitting: Despite using cross-validation, the model might still have picked up patterns specific to the training data that do not apply to the test data.
+
+Model Complexity or Data Characteristics: A PLS model with two components captures some underlying patterns, but there might be other factors affecting permeability that are not well represented by this model or this set of predictors.
+
+While an R2 of 0.298 indicates that the model has some predictive power, it explains less than a third of the variability in the test data. Depending on the application, this may or may not be acceptable.
+
+
+**(e) Try building other models discussed in this chapter. Do any have better predictive performance?**
+
+In this section, we will explore building other models discussed in Chapter 6 to see if any of them offer better predictive performance compared to the PLS model with 2 latent variables. We will consider the following models:
+
+1. Ridge Regression
+
+2. Lasso Regression
+
+3. Elastic Net
+
+4. PCR
+
+We will tune each model using cross-validation and evaluate their performance on the test set. The model with the highest test set R2 will be considered the best performer.
+
+Step 1: Tune and Evaluate Ridge Regression
+
+Ridge regression is a linear regression model that uses L2 regularization to prevent overfitting. We will tune a ridge regression model using cross-validation and evaluate its performance on the test set. We will use the glmnet package for ridge regression.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Use glmnet for ridge regression with alpha = 0
+ridge_tune <- train(permeability ~ ., data = trainTransformed, 
+                    method = "glmnet", 
+                    trControl = train_control,
+                    tuneGrid = expand.grid(alpha = 0, 
+                                           lambda = 10^seq(-3, 3, length = 20)))
+```
+
+
+Step 2: Predict the Response for the Test Set Using Ridge Regression
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Predict permeability on the test set using the optimal ridge model
+ridge_test_predictions <- predict(ridge_tune, newdata = testTransformed)
+```
+
+
+Step 3: Calculate the Test Set Estimate of R2 for Ridge Regression
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Calculate the test set R^2 for ridge regression
+ridge_test_R2 <- cor(ridge_test_predictions, testTransformed$permeability)^2
+cat("Test Set Estimate of R^2 for Ridge Regression:", ridge_test_R2, "\n")
+```
+
+Step 4: Tune and Evaluate Lasso Regression
+
+Lasso regression is a linear regression model that uses L1 regularization to perform variable selection and prevent overfitting. We will tune a lasso regression model using cross-validation and evaluate its performance on the test set. We will use the glmnet package for lasso regression. 
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Use glmnet for lasso regression with alpha = 1
+lasso_tune <- train(permeability ~ ., data = trainTransformed, 
+                    method = "glmnet", 
+                    trControl = train_control,
+                    tuneGrid = expand.grid(alpha = 1, 
+                                           lambda = 10^seq(-3, 3, length = 20)))
+```
+
+
+Step 5: Predict the Response for the Test Set Using Lasso Regression
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Predict permeability on the test set using the optimal lasso model
+lasso_test_predictions <- predict(lasso_tune, newdata = testTransformed)
+```
+
+
+Step 6: Calculate the Test Set Estimate of R2 for Lasso Regression
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Calculate the test set R^2 for lasso regression
+lasso_test_R2 <- cor(lasso_test_predictions, testTransformed$permeability)^2
+cat("Test Set Estimate of R^2 for Lasso Regression:", lasso_test_R2, "\n")
+```
+
+Step 7: Tune and Evaluate Elastic Net
+
+Elastic Net is a linear regression model that combines L1 and L2 regularization to leverage the strengths of both ridge and lasso regression. We will tune an elastic net model using cross-validation and evaluate its performance on the test set. We will use the glmnet package for elastic net regression.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Use glmnet for elastic net with alpha = 0.5
+enet_tune <- train(permeability ~ ., data = trainTransformed, 
+                   method = "glmnet", 
+                   trControl = train_control,
+                   tuneGrid = expand.grid(alpha = 0.5, 
+                                          lambda = 10^seq(-3, 3, length = 20)))
+```
+
+
+Step 8: Predict the Response for the Test Set Using Elastic Net
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Predict permeability on the test set using the optimal elastic net model
+enet_test_predictions <- predict(enet_tune, newdata = testTransformed)
+```
+
+
+Step 9: Calculate the Test Set Estimate of R2 for Elastic Net
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Calculate the test set R^2 for elastic net
+enet_test_R2 <- cor(enet_test_predictions, testTransformed$permeability)^2
+cat("Test Set Estimate of R^2 for Elastic Net:", enet_test_R2, "\n")
+```
+
+Step 10: Tune and Evaluate PCR
+
+Principal Component Regression (PCR) is a regression technique that combines principal component analysis (PCA) with linear regression. We will tune a PCR model using cross-validation and evaluate its performance on the test set. We will use the pls package for PCR.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Tune a PCR model
+pcr_tune <- train(permeability ~ ., data = trainTransformed, 
+                  method = "pcr", 
+                  trControl = train_control,
+                  tuneLength = 20)  # Tests up to 20 components
+```
+
+
+Step 11: Predict the Response for the Test Set Using PCR
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Predict permeability on the test set using the optimal PCR model
+pcr_test_predictions <- predict(pcr_tune, newdata = testTransformed)
+```
+
+
+Step 12: Calculate the Test Set Estimate of R2 for PCR
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Calculate the test set R^2 for PCR
+pcr_test_R2 <- cor(pcr_test_predictions, testTransformed$permeability)^2
+cat("Test Set Estimate of R^2 for PCR:", pcr_test_R2, "\n")
+```
+
+Step 13: Compare Test Set R2 Values
+
+Finally, compare the test set R2 values for each model to determine which model offers the best predictive performance.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Create a data frame to compare test set R2 values
+model_results <- data.frame(
+  Model = c("PLS", "Ridge Regression", "Lasso Regression", "Elastic Net", "PCR"),
+  Test_R2 = c(test_R2, ridge_test_R2, lasso_test_R2, enet_test_R2, pcr_test_R2)
+)
+
+# Identify the row index of the model with the highest test set R2
+best_model_index <- which.max(model_results$Test_R2)
+
+# Create and style the table, highlighting the best model row
+model_results %>%
+  kable(digits = 4, caption = "Test Set R^2 for Each Model") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed")) %>%
+  row_spec(best_model_index, bold = TRUE, background = "lightblue")  # Highlight the best model row
+
+# Print details of the best model
+cat("Best Model:", model_results$Model[best_model_index], "\n")
+cat("Test Set Estimate of R^2 for Best Model:", model_results$Test_R2[best_model_index], "\n")
+
+```
+
+
+Partial Least Squares (PLS) – Test R^2 = 0.2981:
+
+PLS captures some of the variance in the permeability response variable (about 29.8%), but it is relatively low in this comparison.
+
+PLS is often effective with high-dimensional data, but it does not perform as well in this case, possibly because it doesn’t prioritize feature selection based on response correlation as strongly as other models.
+
+Ridge Regression – Test R^2 = 0.3457:
+
+Ridge regression improves on PLS by explaining about 34.6% of the variance in permeability.
+
+This model applies 𝐿2 regularization, which helps reduce overfitting by shrinking coefficients, though it still includes all predictors, potentially limiting its effectiveness if there are many irrelevant features.
+
+Lasso Regression – Test R^2 = 0.3884:
+
+Lasso regression performs better than both PLS and ridge regression, explaining 38.8% of the variance.
+
+It uses L1 regularization, which has the effect of shrinking some coefficients to zero. This feature selection aspect likely improves model performance by focusing on more relevant predictors, reducing noise from irrelevant ones.
+
+Elastic Net – Test R^2 = 0.4930 (Highlighted as the Best Model):
+
+Elastic Net provides the best performance, with a test 𝑅2 of 49.3%, explaining almost half of the variance in permeability.
+
+Elastic Net combines both𝐿1 and𝐿2 regularization, balancing feature selection and coefficient shrinkage. This helps it capture important predictors while also controlling for overfitting, making it particularly effective when there is multicollinearity or when some features are redundant.
+
+This model is highlighted as it has the highest test𝑅2, indicating it generalizes the best to new data in this setup.
+
+Principal Component Regression (PCR) – Test R^2 = 0.2787:
+
+PCR has the lowest𝑅2 of 27.9%, suggesting it captures less of the response variance compared to other methods.
+
+PCR constructs principal components based on predictor variance rather than focusing on the response variable, which may limit its predictive power if the principal components do not align well with the response.
+
+Elastic Net has the best test R2 value, suggesting it is the most effective model for this dataset, likely due to its ability to balance feature selection and regularization.
+
+Lasso Regression also performs well, likely because of its feature selection capability, which reduces noise from less relevant predictors.
+
+PLS and PCR models do not perform as well in this context, potentially due to limited feature selection or response-focused regularization.
+
+If Elastic Net’s performance is satisfactory, it could be chosen as the final model. If higher accuracy is needed, you might consider further tuning Elastic Net or trying additional advanced models.
+
+ **(f) Would you recommend any of your models to replace the permeability laboratory experiment?**
+
+Based on the model test𝑅2 results I provided, Elastic Net appears to be the best-performing model, with an𝑅2 of 0.493. This means it explains approximately 49.3% of the variability in permeability on the test data. While this is the highest R2 among the models tested, it still leaves a substantial amount of variance unexplained, meaning that the predictions deviate notably from the actual permeability values.
+
+Here are some key considerations when evaluating whether a model could replace laboratory permeability experiments:
+
+1. Accuracy Threshold
+
+Elastic Net explains nearly half of the permeability variance, which suggests it captures important patterns but also misses a significant portion of the variability.
+
+To replace a laboratory experiment, a model would generally need a much higher𝑅2 (e.g., above 0.8 or even 0.9), especially in a high-stakes field where precise measurements are critical.
+
+2. Reliability and Consistency
+
+Laboratory measurements are typically designed to provide consistent and reproducible results within defined error margins. If the model’s predictions deviate substantially or inconsistently, it could lead to inaccurate permeability assessments.
+
+With an R2 of 0.493, the Elastic Net model may offer supplementary insights but likely lacks the consistency and precision needed to fully replace laboratory measurements.
+
+3. Cost-Benefit Analysis
+
+If laboratory experiments are costly, time-consuming, or involve difficult-to-obtain resources, using a model as a preliminary filter might be beneficial. For example, the Elastic Net model could help screen compounds that are less likely to meet permeability criteria, reducing the number of laboratory tests needed.
+
+However, for final decision-making, the lab measurements would still be required due to the model’s limited accuracy.
+
+4. Model Interpretability and Feature Importance
+
+Elastic Net does have the advantage of feature selection, meaning it can identify key molecular predictors related to permeability. This can provide valuable insights into the structural properties affecting permeability, which may help guide future experiments or model improvements.
+
+At this stage, I would not recommend replacing the laboratory permeability experiments entirely with the Elastic Net or any of the other models tested, as their predictive power is not sufficient to ensure the accuracy needed for critical decisions. Instead, I could consider:
+
+Using the model as a preliminary screening tool to reduce the number of lab experiments required, especially if it can help eliminate compounds unlikely to meet permeability thresholds.
+
+Further refining the model by exploring additional features, advanced algorithms, or ensemble techniques to increase predictive power.
+
+Combining model predictions with lab measurements in a hybrid approach, where the model helps prioritize and streamline lab experiments but is not a complete replacement.
+
+The model shows promise and could complement laboratory experiments by reducing the workload and providing insights but is not yet a viable replacement for accurate, reliable permeability measurements.
+
+
+# **6.3. A chemical manufacturing process for a pharmaceutical product was discussed in Sect. 1.4. In this problem, the objective is to understand the relationship between biological measurements of the raw materials (predictors), 6.5 Computing 139 measurements of the manufacturing process (predictors), and the response of product yield. Biological predictors cannot be changed but can be used to assess the quality of the raw material before processing. On the other hand, manufacturing process predictors can be changed in the manufacturing process. Improving product yield by 1 % will boost revenue by approximately one hundred thousand dollars per batch:**
+
+**(a) Start R and use these commands to load the data:**
+
+
+```{r pressure, echo=FALSE, warning=FALSE, message=FALSE}
+data(ChemicalManufacturingProcess)
+ChemicalManufacturingProcess
+```
+
+
+The matrix processPredictors contains the 57 predictors (12 describing the input biological material and 45 describing the process predictors) for the 176 manufacturing runs. yield contains the percent yield for each run.
+
+**(b) A small percentage of cells in the predictor set contain missing values. Use an imputation function to fill in these missing values (e.g., see Sect. 3.8).**
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Check for missing values in the predictor set
+missing_values <- sum(is.na(ChemicalManufacturingProcess))
+missing_values
+```
+
+The predictor set contains missing values: sum(is.na(ChemicalManufacturingProcess)) identified missing values in the predictor set, which totaled 106.
+
+To impute missing values, we can use the k-nearest neighbors algorithm, which estimates missing values based on the values of similar observations. This approach can help fill in the missing data points and ensure that the dataset is complete for modeling.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Impute missing values using the k-nearest neighbors algorithm
+imputed_data <- preProcess(ChemicalManufacturingProcess, method = "knnImpute")
+imputed_data <- predict(imputed_data, newdata = ChemicalManufacturingProcess)
+
+# Check for missing values after imputation
+sum(is.na(imputed_data))
+```
+
+After imputation, the dataset no longer contains missing values: sum(is.na(imputed_data)) confirmed that there were no missing values in the dataset after imputation.
+
+This step ensures that the dataset is complete and ready for further analysis and modeling.
+
+
+**(c) Split the data into a training and a test set, pre-process the data, and tune a model of your choice from this chapter. What is the optimal value of the performance metric?**
+
+In this section, we will split the data into training and test sets, pre-process the data, and tune a model to predict the product yield based on the biological and manufacturing process predictors. We will use a model from Chapter 6 and find the optimal value of the performance metric.
+
+I will remove the zero variance variables prior to splitting the data.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+df <- imputed_data %>%
+  select_at(vars(-one_of(nearZeroVar(., names = TRUE))))
+```
+
+
+Step 1: Set Up and Split the Data
+
+Then I split the data into training and test sets to evaluate the model’s performance.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set the seed for reproducibility
+set.seed(123)
+
+# Split the data into training and test sets based on the yield column in df
+trainIndex <- createDataPartition(df$Yield, p = 0.8, list = FALSE)
+train <- df[trainIndex, ]  # Training predictors
+test <- df[-trainIndex, ]  # Testing predictors
+train_yield <- df$Yield[trainIndex]  # Training response
+test_yield <- df$Yield[-trainIndex]  # Testing response
+```
+
+
+Step 2: Pre-process the Data
+
+Next, I pre-process the data by centering and scaling the training predictors and applying the same transformations to the test predictors. This ensures consistency in the data transformations. 
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Pre-process the data (predictors only)
+preProc <- preProcess(train, method = c("center", "scale"))
+
+# Apply pre-processing transformations
+
+trainTransformed <- as.data.frame(predict(preProc, train))  # Ensure it stays a data frame
+testTransformed <- as.data.frame(predict(preProc, test))    # Ensure it stays a data frame
+```
+
+
+Step 3: Add the Response Variable to the Transformed Data
+
+After pre-processing, I add the response variable (yield) back to the transformed training and test sets.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Add yield as the response variable back to the training and test sets
+trainTransformed$Yield <- train_yield
+testTransformed$Yield <- test_yield
+```
+
+
+Step 4: Ensure Column Names Are Valid
+
+I ensure that all column names are syntactically valid and unique to avoid any issues during modeling.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Ensure all column names are syntactically valid and unique
+colnames(trainTransformed) <- make.names(colnames(trainTransformed), unique = TRUE)
+colnames(testTransformed) <- make.names(colnames(testTransformed), unique = TRUE)
+```
+
+
+Step 5: Tune a Model
+
+Now, I tune a model of my choice from Chapter 6 using cross-validation to find the optimal configuration.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set up cross-validation controls
+train_control <- trainControl(method = "cv", number = 10)
+
+# Tune a model of your choice
+tuneResult <- train(Yield ~ ., data = trainTransformed, 
+                    method = "pls", 
+                    trControl = train_control,
+                    tuneLength = 20)  # Tests up to 20 latent variables
+```
+
+
+Step 6: Extract the Optimal Value of the Performance Metric
+
+After tuning the model, I extract the optimal value of the performance metric to understand the model’s performance.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Get the optimal number of latent variables
+optimalLV <- tuneResult$bestTune$ncomp
+cat("Optimal Number of Latent Variables:", optimalLV, "\n")
+
+# Get the resampled estimate of R^2 for the optimal model
+resampledR2 <- max(tuneResult$results$Rsquared)
+cat("Resampled R^2 for Optimal Model:", resampledR2, "\n")
+```
+
+
+The optimal number of latent variables for your Partial Least Squares (PLS) model is 5. The resampled𝑅2 for this optimal model configuration is approximately 0.637.
+
+Optimal Number of Latent Variables (5): This suggests that using 5 latent variables provides the best predictive accuracy based on cross-validation. Increasing the number of latent variables improves model performance up to this point, balancing complexity and predictive power.
+
+Resampled R2 of 0.637: This R2 value indicates that the model explains around 63.7% of the variance in the response variable (yield) on the training data with cross-validation. This is a reasonably good fit, suggesting the model captures a significant portion of the relationship between predictors and the response.
+
+
+Step 7: Review Results and Plot Tuning
+
+Finally, review the results and plot the performance of the model across different numbers of latent variables.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Print a summary of the tuning results
+print(tuneResult)
+
+# Plot tuning results to visualize performance
+plot(tuneResult)
+```
+
+The model selected 5 latent variables as optimal, based on the lowest RMSE during cross-validation.
+
+RMSE (Root Mean Square Error) at n=5: 0.6137 
+
+R2 (Cross-Validated) at n=5: 0.6361
+
+MAE (Mean Absolute Error) at n=5: 0.5093
+
+These metrics suggest that the model with 5 components captures approximately 63.6% of the variance in the target variable (yield) on the cross-validated training set.
+
+The model performance improves as the number of components increases up to 5, where RMSE is minimized. However, adding more components beyond 5 results in an increase in RMSE and a decrease in 
+R2, suggesting diminishing returns and potential overfitting.
+
+RMSE and R2 Improvement: The improvement in RMSE and R2 as we increase the number of components up to 5 indicates that these components capture meaningful variance in the data. However, beyond 5 components, the model likely starts fitting noise rather than informative patterns, leading to an increase in RMSE.
+
+Model Complexity: Using 5 components provides a good balance between capturing relevant patterns in the data and maintaining model simplicity. Adding more than 5 components does not enhance predictive accuracy and may instead overfit the training data.
+
+
+The plot you've shared shows RMSE (Cross-Validation) on the y-axis against # Components (number of latent variables) on the x-axis. Here’s an interpretation based on the visual data:
+
+Optimal Number of Components (Minimized RMSE):
+
+The RMSE decreases significantly from 1 to around 5 components, suggesting that the initial components capture substantial variance and improve predictive accuracy.
+RMSE appears to reach its minimum around 5 components, which aligns with the earlier finding that 5 components yielded the lowest RMSE.
+Increasing RMSE Beyond 5 Components:
+
+After 5 components, RMSE starts to increase gradually. This rise in RMSE with additional components suggests overfitting, where the model begins to fit noise rather than meaningful patterns.
+This increase indicates that additional complexity from components beyond 5 does not contribute to improved generalization but rather harms model performance.
+Recommendation Based on the Plot:
+
+Based on this plot, 5 components is the optimal choice for balancing model complexity and predictive accuracy. Adding more components beyond this point does not improve performance and could lead to overfitting.
+
+The plot confirms that 5 components is the optimal choice for this PLS model, as it minimizes RMSE without introducing unnecessary complexity. This approach should yield the best generalization on new data. 
+
+**(d) Predict the response for the test set. What is the value of the performance metric and how does this compare with the resampled performance metric on the training set?**
+
+Step 1: Predict the Response for the Test Set
+
+Using the tuned PLS model with 5 latent variables, predict the response variable (yield) for the test set.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Predict yield on the test set using the optimal model
+test_predictions <- predict(tuneResult, newdata = testTransformed)
+```
+
+
+Step 2: Calculate the Test Set Estimate of R2
+
+Calculate the test set estimate of R2 to evaluate the model’s performance on unseen data.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Calculate the test set R^2
+# Note: Ensure that `test_yield` is the actual response for the test set
+test_R2 <- cor(test_predictions, testTransformed$Yield)^2
+cat("Test Set Estimate of R^2:", test_R2, "\n")
+```
+
+The test set estimate of R2 is 0.612, indicating that the model explains approximately 61.2% of the variance in the yield response variable on the test data.
+
+Comparison with Resampled Performance Metric:
+
+The resampled R2 on the training set was approximately 0.637, while the test set R2 is 0.612.
+
+The test set R2 is slightly lower than the resampled R2 on the training set, indicating that the model’s performance on unseen data is slightly reduced compared to the cross-validated training performance.
+
+This drop in R2 suggests that the model may not generalize as well to new data as it does to the training data. While the model still explains a significant portion of the variance in the test data, there is a small decrease in predictive performance compared to the training set.
+
+Overall, the model performs well on the test set, explaining over 61% of the variance in the yield response variable. This indicates that the model captures important patterns in the data and provides valuable predictive insights for product yield.
+
+
+**(e) Which predictors are most important in the model you have trained? Do either the biological or process predictors dominate the list?**
+
+To identify the most important predictors in the model, we can examine the variable importance scores. These scores indicate the contribution of each predictor to the model’s performance and can help identify the most influential predictors.
+
+Step 1: Extract Variable Importance Scores
+
+First, we extract the variable importance scores from the tuned PLS model to understand the importance of each predictor.
+
+
+`
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Extract variable importance scores from the PLS model
+variable_importance <- varImp(tuneResult, scale = FALSE)
+
+# Convert the importance scores to a data frame and order by the "Overall" column
+variable_importance_df <- variable_importance$importance
+top_10_predictors <- head(variable_importance_df[order(-variable_importance_df$Overall), , drop = FALSE], 10)
+
+# Display the top 10 predictors as a formatted table
+top_10_predictors %>%
+  kable(caption = "Top 10 Variable Importance Scores", digits = 4) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover")) %>%
+  row_spec(0, extra_css = "padding: 8px;")
+```
+
+
+The variable importance scores provide insights into the contribution of each predictor to the model’s performance. Higher scores indicate more influential predictors, while lower scores suggest less impact on the model’s predictions.
+
+Manufacturing Process Variables: The high importance scores for variables related to manufacturing processes suggest that the yield (or outcome of interest) is heavily influenced by specific aspects of the manufacturing setup or conditions. This might include factors like temperature, pressure, or other process-specific parameters.
+
+Biological Material Variables: The presence of biological materials among the top predictors, though with slightly lower scores, suggests that raw material properties also play a role, although they may not be as influential as the manufacturing settings.
+
+Overall, the model appears to emphasize manufacturing process variables in predicting product yield, indicating that optimizing process parameters could have a more significant impact on yield than raw material quality. However, both types of predictors contribute to the model’s performance, highlighting the importance of considering both biological and process factors in understanding and improving product yield.
+
+
+Step 2: Identify the Most Important Predictors
+
+Next, we can identify the most important predictors based on the variable importance scores. We can examine the top predictors to understand which features have the greatest influence on the model.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Load knitr for table formatting (if not already loaded)
+library(knitr)
+
+# Extract and sort the variable importance scores
+variable_importance_scores <- variable_importance$importance  # Access the importance scores
+top_20_predictors <- head(variable_importance_scores[order(-variable_importance_scores$Overall), , drop = FALSE], 10)
+
+
+# Display the top 10 predictors as a formatted table with extra styling
+top_20_predictors %>%
+  kable(caption = "Top 10 Predictors by Importance", digits = 4) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+```
+
+
+The importance scores in the table reflect the relative influence of each predictor variable on the model's ability to predict the response (likely something like yield or product quality in your case). Here’s a breakdown of what these scores mean and how they are interpreted.
+
+n your Partial Least Squares (PLS) model, each predictor was assigned an importance score. This score is a measure of how strongly each predictor is associated with the outcome variable. Higher scores indicate a stronger relationship with the outcome and greater importance in the model, while lower scores suggest a weaker relationship.
+
+Interpretation: These high scores mean that these manufacturing process variables have a strong influence on the outcome. Small changes in these predictors are likely to result in noticeable changes in the response variable.
+
+Implication: In practice, these are critical variables to monitor and control. They should be prioritized for optimization, as they are the biggest drivers of model predictions.
+
+Interpretation: These scores, while lower than the top predictors, still represent significant contributions to the model. These variables moderately impact the response, though not as strongly as the highest-ranking predictors.
+
+Implication: These variables are still valuable for understanding the outcome but are less impactful than the top-ranked predictors. They might be secondary factors that influence the process in more specific or subtle ways.
+
+Interpretation: These scores indicate that the biological material variables do influence the outcome, but their impact is less than that of the manufacturing process variables.
+
+Implication: While they are not the main drivers, these predictors still have a role in the model. They might represent characteristics of raw materials that affect product quality, but their influence is more limited compared to manufacturing conditions.
+
+Manufacturing Process Variables: The manufacturing process variables have the highest scores because they are likely more directly connected to the outcome (e.g., yield or quality). Variables like temperature, pressure, time, or specific process steps can have immediate and substantial impacts on product characteristics. The high scores reflect this direct influence.
+
+Biological Material Variables: The biological material variables (like material quality, composition, or source) have lower scores, which suggests that they have a less direct impact. These variables may contribute to overall variability but are not as tightly connected to the response variable as the process parameters.
+
+Process Optimization: By focusing on the variables with the highest scores, you can prioritize process optimization. For example, controlling or fine-tuning ManufacturingProcess32 or ManufacturingProcess17 could lead to improved consistency or higher yields.
+
+Monitoring and Quality Control: High-ranking variables should be carefully monitored. If these variables deviate from optimal levels, the outcome could be significantly impacted. Lower-ranked variables can still be monitored but may not require as strict control.
+
+Reducing Complexity: If you want to simplify the model, you can consider focusing on the top predictors with the highest scores, as they explain most of the variance in the response. This approach can reduce the model’s complexity without sacrificing much predictive power.
+
+By understanding the importance scores, you can identify the key predictors that drive the model’s predictions and focus on optimizing or controlling these factors to improve product yield or quality.
+
+The top predictors provide valuable insights into the critical variables that influence the outcome and guide decision-making for process optimization and quality assurance.
+
+Based on the list of top predictors and their importance scores, the process predictors clearly dominate over the biological predictors. 
+
+Out of the top 10, 7 predictors are related to the manufacturing process. They also have the highest scores in the list, indicating they have a more substantial impact on the response variable.
+
+Only 3 out of the top 10 predictors are biological materials, and they have slightly lower scores compared to the process predictors.
+
+The process predictors dominate the list both in terms of number and importance score. This dominance suggests that the manufacturing process variables have a greater impact on the outcome variable (e.g., yield or quality) compared to the biological material properties.
+
+Since process predictors dominate, optimizing and controlling these variables is likely to have the most substantial effect on improving or stabilizing the outcome. Fine-tuning the process parameters (like those represented by ManufacturingProcess32 and ManufacturingProcess17) could lead to significant improvements in performance.
+
+While biological materials are still relevant (as indicated by their presence in the top 10), their impact is relatively lower. Ensuring consistency in the quality of these materials is beneficial, but the main focus for improvements should remain on the process conditions.
+
+The process predictors are the dominant contributors to the model, highlighting the importance of controlling and optimizing the manufacturing process for desired outcomes.
+
+
+**(f) Explore the relationships between each of the top predictors and the response. How could this information be helpful in improving yield in future runs of the manufacturing process?**
+
+
+To explore the relationships between the top predictors and the response variable (yield), we can conduct a more in-depth analysis, such as visualizing the relationships, identifying patterns, and understanding how changes in these predictors affect the outcome. This information can provide valuable insights for improving yield in future runs of the manufacturing process.
+
+Step 1: Visualize Relationships
+
+One way to explore the relationships is to create scatter plots or other visualizations that show how the top predictors relate to the response variable. This can help identify trends, correlations, or patterns that may guide process optimization. 
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Select the top predictors from the training data
+top_predictors <- colnames(trainTransformed)[head(order(variable_importance$importance$Overall, decreasing = TRUE), 10)]
+
+# Create scatter plots to visualize relationships between top predictors and yield
+scatter_plots <- lapply(top_predictors, function(predictor) {
+  ggplot(trainTransformed, aes_string(x = predictor, y = "Yield")) +
+    geom_point() +
+    labs(title = paste("Scatter Plot of", predictor, "vs. Yield"),
+         x = predictor, y = "Yield")
+})
+
+# Display the scatter plots
+scatter_plots[[1]]
+scatter_plots[[2]]
+scatter_plots[[3]]
+scatter_plots[[4]]
+scatter_plots[[5]]
+scatter_plots[[6]]
+scatter_plots[[7]]
+scatter_plots[[8]]
+scatter_plots[[9]]
+scatter_plots[[10]]
+```
+
+
+The scatter plots visualize the relationships between the top predictors and the response variable (yield). By examining these plots, we can gain insights into how changes in these predictors impact the yield and identify potential patterns or trends that could guide process improvements. 
+
+Step 2: Interpret Relationships
+
+After visualizing the relationships, we can interpret the patterns observed in the scatter plots to understand how each predictor influences the yield. Here are some key considerations:
+
+Positive Correlation: If a predictor shows a positive correlation with yield, increasing that predictor may lead to higher yields. For example, if ManufacturingProcess32 has a positive relationship with yield, optimizing this process parameter could improve yield.
+
+Negative Correlation: Conversely, a negative correlation suggests that increasing the predictor may decrease yield. In this case, reducing or controlling the predictor could lead to better outcomes. For instance, if ManufacturingProcess17 has a negative relationship with yield, stabilizing this parameter could prevent yield losses.
+
+
+Nonlinear Relationships: Some predictors may exhibit nonlinear relationships with yield, where the impact on yield changes at different levels of the predictor. Understanding these nonlinearities can help identify optimal operating ranges for the predictors.
+
+Interaction Effects: Interaction effects occur when the combined influence of two predictors is different from the sum of their individual effects. Detecting interactions can provide insights into complex relationships that affect yield.
+
+Threshold Effects: Threshold effects indicate that a predictor has a significant impact on yield only above or below a certain threshold value. Identifying these thresholds can help define critical operating conditions for maximizing yield.
+
+Outliers and Anomalies: Outliers or anomalies in the data can distort the relationships between predictors and yield. Identifying and addressing these data points can improve the accuracy of the relationship analysis.
+
+By exploring the relationships between the top predictors and yield, we can uncover valuable insights that inform process optimization strategies. Understanding how changes in specific process parameters or material properties affect yield can guide decision-making in future manufacturing runs.
+
+Step 3: Implement Process Improvements
+
+Based on the insights gained from the relationship analysis, we can implement process improvements to enhance yield in future manufacturing runs. Here are some strategies that could be helpful:
+
+Optimize Critical Process Parameters: Focus on optimizing the manufacturing process variables that have the strongest impact on yield. Fine-tuning these parameters within optimal ranges can lead to improved yield outcomes.
+
+Control Variability: Identify predictors that exhibit high variability and work to control or reduce this variability. Consistent process conditions can help stabilize yield and minimize fluctuations.
+
+Monitor Key Predictors: Continuously monitor the top predictors to ensure they remain within desired ranges. Implement real-time monitoring systems to detect deviations and take corrective actions promptly.
+
+Experimentation and Testing: Conduct controlled experiments to explore the effects of changes in predictors on yield. By systematically varying process parameters and observing the outcomes, you can identify optimal settings for maximizing yield.
+
+Feedback Loop: Establish a feedback loop where data from each manufacturing run is analyzed to identify trends, patterns, and opportunities for improvement. Use this feedback to adjust process parameters and refine strategies for future runs.
+
+Continuous Improvement: Embrace a culture of continuous improvement by regularly reviewing and updating process optimization strategies. Encourage collaboration between different teams to leverage diverse expertise and insights.
+
+By leveraging the information gained from exploring the relationships between predictors and yield, you can develop targeted strategies to enhance yield in future manufacturing runs. This data-driven approach can lead to more efficient processes, higher product quality, and increased profitability.
+
+The relationships between the top predictors and the response variable (yield) provide valuable insights into the factors that influence product quality and yield in the manufacturing process. By understanding these relationships, you can identify critical process parameters, optimize operating conditions, and implement targeted improvements to enhance yield and overall process performance.
+
+The scatter plots visualize the relationships between each top predictor and the response variable (yield), allowing you to identify trends, correlations, and patterns that may guide process optimization. By interpreting these relationships and implementing process improvements based on the insights gained, you can enhance yield in future runs of the manufacturing process.
+
+The information obtained from exploring these relationships can be instrumental in improving yield and product quality, leading to more efficient and effective manufacturing processes. By focusing on the most important predictors and understanding their impact on the outcome, you can drive continuous improvement and achieve better results in future manufacturing runs.
+
+By leveraging the insights gained from the relationships between predictors and yield, you can optimize process parameters, control variability, and implement targeted strategies to enhance yield and overall process performance. This data-driven approach can lead to more efficient processes, higher product quality, and increased profitability in the manufacturing process.
+
+
+
