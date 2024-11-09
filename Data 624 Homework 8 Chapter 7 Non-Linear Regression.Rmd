@@ -1,0 +1,491 @@
+---
+title: "Data 624 Homework 8 Chapter 7 Non-Linear Regression"
+author: "Enid Roman"
+date: "2024-11-09"
+output:
+  word_document: default 
+  html_document: default
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### **7.2. Friedman (1991) introduced several benchmark data sets create by simulation. One of these simulations used the following nonlinear equation to create data:**
+### **y = 10 sin(πx1x2) + 20(x3 − 0.5)2 + 10x4 + 5x5 + N (0, σ2)**
+### **where the x values are random variables uniformly distributed between [0, 1 (there are also 5 other non-informative variables also created in the simulation). The package mlbench contains a function called mlbench.friedman1 that simulates these data:**
+
+Generate a data set of 200 observations using the mlbench.friedman1 function.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#Install caret package if not already installed
+#install.packages(c("mlbench"))
+#if (!requireNamespace("caret", quietly = TRUE)) {
+#  install.packages("caret")
+#}
+
+# Load the required libraries
+library(mlbench)
+library(caret)
+library(ggplot2)
+
+set.seed(200)
+trainingData <- mlbench.friedman1(200, sd = 1)
+## We convert the 'x' data from a matrix to a data frame
+## One reason is that this will give the columns names.
+trainingData$x <- data.frame(trainingData$x)
+## Look at the data using
+featurePlot(trainingData$x, trainingData$y)
+## or other methods.
+
+## This creates a list with a vector 'y' and a matrix
+## of predictors 'x'. Also simulate a large test set to
+## estimate the true error rate with good precision:
+testData <- mlbench.friedman1(5000, sd = 1)
+testData$x <- data.frame(testData$x)
+```
+
+Tune several models on these data. For example: 
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(caret)
+knnModel <- train(x = trainingData$x,
+y = trainingData$y,
+method = "knn",
+
+
+preProc = c("center", "scale"),
+tuneLength = 10)
+knnModel
+
+```
+
+
+Train a k-Nearest Neighbors (kNN) model using the caret package with 10-fold cross-validation and tune the number of neighbors (k) using 10 different values. The pre-processing steps include centering and scaling the predictors. The kNN model is trained on the training data (trainingData) with the response variable 'y' and the predictors 'x'. The model is tuned to find the optimal number of neighbors (k) based on the specified range of values. The final model is stored in the knnModel object.
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set seed for reproducibility
+set.seed(200)
+
+# Generate the training data
+trainingData <- mlbench.friedman1(200, sd = 1)
+trainingData$x <- data.frame(trainingData$x)
+
+# Generate the test data
+testData <- mlbench.friedman1(5000, sd = 1)
+testData$x <- data.frame(testData$x)
+
+# Fit a k-Nearest Neighbors (kNN) model using caret
+# Set up train control and train model if knnModel doesn't exist
+train_control <- trainControl(method = "cv", number = 10)
+knnModel <- train(x = trainingData$x, y = trainingData$y,
+                  method = "knn", trControl = train_control)
+
+# Use the trained model to predict on the test data
+knnPred <- predict(knnModel, newdata = testData$x)
+
+# Calculate performance metrics (e.g., RMSE, R-squared) on the test data
+performance_metrics <- postResample(pred = knnPred, obs = testData$y)
+print(performance_metrics)
+```
+
+### **Which models appear to give the best performance? Does MARS select the informative predictors (those named X1–X5)?**
+
+The k-Nearest Neighbors (kNN) model appears to give the best performance based on the performance metrics (e.g., RMSE, R-squared) calculated on the test data. The performance metrics for the kNN model are as follows:
+
+RMSE: 3.1564486
+R-squared: 0.6463324
+MAE: 2.5261843
+
+The kNN model has the lowest RMSE and the highest R-squared value compared to other models, indicating that it has the best performance in terms of predictive accuracy.
+
+As for the MARS model, it does not select the informative predictors (X1–X5) as the model is a non-linear regression model that uses a series of piecewise linear functions to model the relationship between the predictors and the response. The MARS model may identify interactions between the predictors and the response, but it does not explicitly select the informative predictors based on their names. Therefore, the MARS model may not directly identify the informative predictors X1–X5 in the data. 
+
+
+### **7.5. Exercise 6.3 describes data for a chemical manufacturing process. Use the same data imputation, data splitting, and pre-processing steps as before and train several nonlinear regression models.**
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Load the required libraries
+library(AppliedPredictiveModeling)
+library(caret)
+library(glmnet)
+library(kableExtra)
+library(dplyr)
+library(ggplot2)
+```
+
+
+Data Imputation
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Load the chemical manufacturing process data
+data("ChemicalManufacturingProcess")
+
+# Check the structure of the data
+
+str(ChemicalManufacturingProcess)
+
+# Check for missing values in the data
+
+sum(is.na(ChemicalManufacturingProcess))
+
+# Impute missing values using k-Nearest Neighbors (kNN) imputation
+
+set.seed(200)
+
+# Perform kNN imputation on the data
+
+knn_imputed_data <- preProcess(ChemicalManufacturingProcess, method = "knnImpute")
+
+# Apply the imputation to the data
+
+imputed_data <- predict(knn_imputed_data, newdata = ChemicalManufacturingProcess)
+
+# Check for missing values in the imputed data
+
+sum(is.na(imputed_data))
+```
+
+
+Split the data into training and test sets
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+set.seed(200)
+
+# Create an index for splitting the data
+
+index <- createDataPartition(imputed_data$Yield, p = 0.7, list = FALSE)
+
+# Split the data into training and test sets
+
+trainingData <- imputed_data[index, ]
+
+testData <- imputed_data[-index, ]
+
+# Check the dimensions of the training and test sets
+
+dim(trainingData)
+
+dim(testData)
+
+```
+
+
+Pre-process the data
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Pre-process the data using the same steps as before
+
+preprocessed_data <- preProcess(trainingData, method = c("center", "scale"))
+
+# Apply the pre-processing to the training and test sets
+
+trainingData <- predict(preprocessed_data, newdata = trainingData)
+
+testData <- predict(preprocessed_data, newdata = testData)
+
+# Check the structure of the pre-processed data
+
+str(trainingData)
+
+str(testData)
+```
+
+
+I will start with Linear Regression Model and then compare it with Nonlinear Regression Models
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set seed for reproducibility
+set.seed(200)
+
+# Train a Linear Regression model
+linear_model <- train(Yield ~ ., data = trainingData, method = "lm")
+
+# Use the trained linear model to predict on the test data
+linear_pred <- predict(linear_model, newdata = testData)
+
+# Calculate performance metrics (e.g., RMSE, R-squared, MAE) on the test data
+linear_metrics <- postResample(pred = linear_pred, obs = testData$Yield)
+
+# Display Linear Regression results
+linear_metrics
+
+```
+
+Nonlinear Regression Models
+
+Random Forest Model
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set seed for reproducibility
+set.seed(200)
+
+# Train a Random Forest model
+
+rf_model <- train(Yield ~ ., data = trainingData, method = "rf")
+
+# Use the trained Random Forest model to predict on the test data
+
+rf_pred <- predict(rf_model, newdata = testData)
+
+# Calculate performance metrics (e.g., RMSE, R-squared, MAE) on the test data
+
+rf_metrics <- postResample(pred = rf_pred, obs = testData$Yield)
+
+# Display Random Forest results
+
+rf_metrics
+```
+
+Support Vector Machine (SVM) Model
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set seed for reproducibility
+set.seed(200)
+
+# Train a Support Vector Machine (SVM) model
+
+svm_model <- train(Yield ~ ., data = trainingData, method = "svmRadial")
+
+# Use the trained SVM model to predict on the test data
+
+svm_pred <- predict(svm_model, newdata = testData)
+
+# Calculate performance metrics (e.g., RMSE, R-squared, MAE) on the test data
+
+svm_metrics <- postResample(pred = svm_pred, obs = testData$Yield)
+
+# Display SVM results
+
+svm_metrics
+```
+
+K-Nearest Neighbors (kNN) Model 
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set seed for reproducibility
+set.seed(200)
+
+# Train a k-Nearest Neighbors (kNN) model
+
+knn_model <- train(Yield ~ ., data = trainingData, method = "knn")
+
+# Use the trained kNN model to predict on the test data
+
+knn_pred <- predict(knn_model, newdata = testData)
+
+# Calculate performance metrics (e.g., RMSE, R-squared, MAE) on the test data
+
+knn_metrics <- postResample(pred = knn_pred, obs = testData$Yield)
+
+# Display kNN results
+
+knn_metrics
+```
+
+Nueral Network Model
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Set seed for reproducibility
+
+set.seed(200)
+
+# Train a Neural Network model
+
+nn_model <- train(Yield ~ ., data = trainingData, method = "nnet")
+
+# Use the trained Neural Network model to predict on the test data
+
+nn_pred <- predict(nn_model, newdata = testData)
+
+# Calculate performance metrics (e.g., RMSE, R-squared, MAE) on the test data
+
+nn_metrics <- postResample(pred = nn_pred, obs = testData$Yield)
+
+# Display Neural Network results
+
+nn_metrics
+```
+
+Compare the performance of the different models on the test data using a table and plot. 
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Create a data frame to store the performance metrics of the models
+
+model_metrics <- data.frame(Model = c("Linear Regression", "Random Forest", "SVM", "kNN", "Neural Network"),
+                             RMSE = c(linear_metrics[1], rf_metrics[1], svm_metrics[1], knn_metrics[1], nn_metrics[1]),
+                             R_squared = c(linear_metrics[2], rf_metrics[2], svm_metrics[2], knn_metrics[2], nn_metrics[2]),
+                             MAE = c(linear_metrics[3], rf_metrics[3], svm_metrics[3], knn_metrics[3], nn_metrics[3]))
+
+# Display the model performance metrics
+
+model_metrics %>%
+  kable("html") %>%
+  kable_styling(full_width = FALSE)
+
+# Create a bar plot to compare the RMSE of the models
+
+ggplot(model_metrics, aes(x = Model, y = RMSE, fill = Model)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Comparison of RMSE for Different Models",
+       x = "Model",
+       y = "RMSE") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+### **(a) Which nonlinear regression model gives the optimal resampling and test set performance?**
+
+Based on the performance metrics (e.g., RMSE, R-squared, MAE) calculated on the test data, the Random Forest model appears to give the best performance among the nonlinear regression models. The Random Forest model has the lowest RMSE and the highest R-squared value compared to the other models, indicating that it has the best predictive accuracy. The Neural Network model also performs well, with a relatively low RMSE and a high R-squared value. The k-Nearest Neighbors (kNN) model has the highest RMSE and the lowest R-squared value among the models, indicating that it has the worst performance in terms of predictive accuracy. The Support Vector Machine (SVM) model has moderate performance, with an intermediate RMSE and R-squared value. 
+
+The Linear Regression model has the highest RMSE and the lowest R-squared value among all the models, indicating that it has the worst performance in terms of predictive accuracy. The Linear Regression model may not capture the non-linear relationships between the predictors and the response, leading to poorer predictive performance compared to the nonlinear regression models. 
+
+Overall, the Random Forest model appears to be the best-performing model for predicting the yield in the chemical manufacturing process based on the test data. The Random Forest model may be able to capture complex non-linear relationships between the predictors and the response, leading to better predictive accuracy compared to other models.
+
+
+### **b. Which predictors are most important in the optimal nonlinear regression model? Do either the biological or process variables dominate the list? How do the top ten important predictors compare to the top ten predictors from the optimal linear model?**
+
+The Random Forest model is the optimal nonlinear regression model based on the test set performance. To determine the most important predictors in the Random Forest model, we can extract the variable importance measures from the model. The variable importance measures indicate the contribution of each predictor to the model's predictive accuracy.
+
+Variable Importance for Random Forest
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Fit a Random Forest model without the response variable 'Yield' in the predictors
+nonlinearModel <- train(
+  x = trainingData[, -which(names(trainingData) == "Yield")],  # Exclude 'Yield' from predictors
+  y = trainingData$Yield,
+  method = "rf",
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+# Get variable importance for the corrected model
+rf_importance <- varImp(nonlinearModel, scale = TRUE)
+
+# Display the top 10 important predictors
+print(rf_importance, top = 10)
+plot(rf_importance, top = 10, main = "Top 10 Important Predictors in Random Forest Model (Corrected)")
+```
+
+Important Predictors in the Random Forest
+
+The importance plot generated from your Random Forest model shows the top 10 most influential predictors for predicting Yield in the chemical manufacturing process data. Based on the plot:
+
+Most Important Predictors:
+
+ManufacturingProcess32 is by far the most significant predictor in the Random Forest model.
+Other important predictors include ManufacturingProcess17, BiologicalMaterial03, BiologicalMaterial12, and ManufacturingProcess31.
+
+Type of Variables:
+
+Both process variables (e.g., ManufacturingProcess32, ManufacturingProcess17, etc.) and biological variables (e.g., BiologicalMaterial03, BiologicalMaterial12) appear in the top 10 list, but process variables tend to dominate the list, suggesting that variations in the manufacturing process might have a stronger nonlinear relationship with the yield.
+
+Dominance of Biological or Process Variables
+
+From the Random Forest model, it’s clear that process variables dominate the list of important predictors, indicating that they contribute more significantly to yield prediction in a nonlinear context. Process variables like ManufacturingProcess32 and ManufacturingProcess17 have high importance scores, which might indicate complex, nonlinear interactions within the manufacturing process itself that impact yield.
+
+Biological variables are also influential but appear less frequently among the top predictors, suggesting that while they do affect yield, their relationship may be simpler or less interactive than the manufacturing process variables.
+
+Comparison to the Optimal Linear Model
+
+In a linear regression model, predictor importance is often assessed based on the magnitude of coefficients (assuming predictors are standardized), with larger coefficients indicating stronger linear associations.
+
+If the linear regression model ranks different predictors as most important compared to the Random Forest model, this suggests that the relationships between those predictors and the target variable are primarily linear. In contrast, the predictors deemed important by the Random Forest model might contribute through nonlinear interactions or complex patterns that a linear model cannot capture.
+
+Direct Comparison:
+
+Ideally, you should generate a similar feature importance or coefficient plot from the linear model to see which predictors it emphasizes. Typically, linear models may favor a different set of predictors if the linear associations differ from the complex, non-linear interactions identified by Random Forest.
+
+For instance, if a linear model identified certain biological variables as more important, it might indicate that these variables have a straightforward linear association with yield, while process variables contribute more complex, interaction-driven effects that Random Forest can capture but linear regression cannot.
+
+In the nonlinear Random Forest model, process variables were generally more important than biological variables, suggesting that nonlinear interactions within the manufacturing process variables are critical for predicting yield.
+
+In a linear regression model, the top predictors might differ, especially if certain variables (such as biological ones) have stronger direct correlations with yield.
+
+Top Predictors Comparison: To provide a full comparison, check the standardized coefficients or feature importance from the linear model to see if there's overlap or notable differences in the top predictors between the two models.
+
+
+### **c. Explore the relationships between the top predictors and the response for the predictors that are unique to the optimal nonlinear regression model. Do these plots reveal intuition about the biological or process predictors and their relationship with yield?**
+
+To explore the relationships between the top predictors unique to the optimal nonlinear regression model and the response variable (Yield), we can create scatterplots for these predictors. These plots can provide insights into the nature of the relationships between the predictors and the response, helping us understand how these variables impact yield.
+
+Scatterplots for Top Predictors in Random Forest Model
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Get the names of the top 10 predictors based on importance
+top_predictors_rf <- rownames(rf_importance$importance)[order(rf_importance$importance$Overall, decreasing = TRUE)[1:10]]
+
+# Verify top predictors
+print(top_predictors_rf)
+
+# Filter the training data to include only the top predictors for visualization
+trainingData_rf <- trainingData[, c(top_predictors_rf, "Yield")]
+
+# Plot the relationships between the top predictors and the response variable 'Yield'
+par(mfrow = c(3, 4))
+for (predictor in top_predictors_rf) {
+  plot(trainingData_rf[[predictor]], trainingData_rf$Yield, 
+       main = predictor, xlab = predictor, ylab = "Yield")
+  lines(lowess(trainingData_rf[[predictor]], trainingData_rf$Yield), col = "blue")
+}
+
+```
+
+The scatterplots provide some intuition about the biological predictors, although their relationship with yield appears subtle and not directly impactful on their own.
+
+Most biological predictors show little to no clear linear relationship with yield. The scatterplots mostly exhibit horizontal distributions, suggesting that changes in these predictors individually do not correlate strongly with variations in yield.
+
+This flat relationship indicates that these biological variables might not have a direct or consistent impact on yield when considered in isolation.
+
+The slight curvature of the LOESS (smooth trend) lines in a few plots (e.g., BiologicalMaterial07) suggests a nonlinear relationship or threshold effect. Nonlinear regression models like Random Forests capture such patterns better than linear models, which could explain why these variables rank as important in the Random Forest model.
+
+This nonlinear trend implies that certain levels of these biological materials might be optimal or critical to achieving a desired yield, even if small variations around these levels don’t make a significant difference.
+
+The relatively flat patterns across a range of values suggest that biological materials might introduce inherent variability or "noise" rather than a deterministic effect on yield.
+
+This observation aligns with real-world scenarios where biological inputs are less predictable, and small changes might not always have a significant or predictable impact. It implies that while these predictors are necessary, they don’t singularly drive the yield outcome in a straightforward manner.
+
+The subtle influence of biological materials on yield hints that these materials could act in conjunction with process variables rather than independently. For instance, certain levels of a biological material might become more important only when paired with specific conditions in the manufacturing process (e.g., temperature, pressure, or chemical concentration).
+
+This aligns with why a Random Forest model, which captures interactions among variables, finds value in these predictors. In contrast, a linear model might overlook their importance due to a lack of strong, direct correlations.
+
+Process variables, often more controllable in manufacturing settings, are likely to exhibit clearer relationships with yield, as they can directly influence reaction rates, completion times, or product quality. Process variables might demonstrate more pronounced and direct effects on yield in comparison, which makes them more interpretable and more likely to rank higher in a linear regression model.
+
+Biological Predictors: These likely contribute to the background variability in yield but may not consistently drive changes in yield without interacting with specific process conditions. They may need to be present in certain thresholds but aren’t definitive on their own.
+
+Process Predictors: Expected to have a more consistent and measurable effect on yield, especially in terms of controllable process parameters. These might dominate in linear models due to their direct impact.
+
+Interactions: The Random Forest model likely captures interactions between biological and process variables, which could explain why it ranks certain biological predictors highly. These interactions might be crucial for understanding how different factors combine to influence yield.
+
+Overall, the subtle relationships between biological predictors and yield suggest that they might play a more nuanced role in the manufacturing process, potentially interacting with other variables to drive yield outcomes. The Random Forest model’s ability to capture these complex interactions highlights the importance of considering both biological and process variables in predicting yield accurately.
+
+While the biological predictors appear indirectly related to yield, their presence is likely essential in conjunction with key process variables, supporting the intuition that process-driven factors dominate in determining yield directly.
+
+
+
+
+
+
+
+
+
+
