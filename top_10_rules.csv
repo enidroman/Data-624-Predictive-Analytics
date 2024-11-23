@@ -1,0 +1,11 @@
+"rules","support","confidence","coverage","lift","count"
+"{rice,sugar} => {whole milk}",0.00122013218098627,1,0.00122013218098627,3.91364902506964,12
+"{canned fish,hygiene articles} => {whole milk}",0.00111845449923742,1,0.00111845449923742,3.91364902506964,11
+"{butter,rice,root vegetables} => {whole milk}",0.00101677681748856,1,0.00101677681748856,3.91364902506964,10
+"{flour,root vegetables,whipped/sour cream} => {whole milk}",0.00172852058973055,1,0.00172852058973055,3.91364902506964,17
+"{butter,domestic eggs,soft cheese} => {whole milk}",0.00101677681748856,1,0.00101677681748856,3.91364902506964,10
+"{citrus fruit,root vegetables,soft cheese} => {other vegetables}",0.00101677681748856,1,0.00101677681748856,5.16815554387809,10
+"{butter,hygiene articles,pip fruit} => {whole milk}",0.00101677681748856,1,0.00101677681748856,3.91364902506964,10
+"{hygiene articles,root vegetables,whipped/sour cream} => {whole milk}",0.00101677681748856,1,0.00101677681748856,3.91364902506964,10
+"{hygiene articles,pip fruit,root vegetables} => {whole milk}",0.00101677681748856,1,0.00101677681748856,3.91364902506964,10
+"{cream cheese,domestic eggs,sugar} => {whole milk}",0.00111845449923742,1,0.00111845449923742,3.91364902506964,11
